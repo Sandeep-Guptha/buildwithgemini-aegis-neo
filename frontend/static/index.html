@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aegis-NEO · Planetary Defense Command Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
+<style>
+  :root {
+    --bg-main: #070b14;
+    --bg-pane: #0d1527;
+    --bg-card: #131f38;
+    --bg-card-hover: #1c2b4d;
+    --accent: #2563eb;
+    --accent-glow: rgba(37, 99, 235, 0.4);
+    --border: #202f50;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --hazard-red: #ef4444;
+    --hazard-glow: rgba(239, 68, 68, 0.3);
+    --safe-green: #10b981;
+    --warning-amber: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(90deg, #070e20 0%, #0f1f42 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    z-index: 20;
+    flex-shrink: 0;
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .header-left h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #60a5fa, #93c5fd);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .badge-live {
+    font-size: 0.7rem;
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--safe-green);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .badge-live::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--safe-green);
+    box-shadow: 0 0 8px var(--safe-green);
+  }
+
+  /* RESIZABLE DASHBOARD WRAPPER */
+  .dashboard-wrapper {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+    height: calc(100vh - 56px);
+  }
+
+  /* LEFT: POWER BI ANALYTICS PANE (SCROLLABLE & RESIZABLE) */
+  .analytics-pane {
+    width: 58%;
+    min-width: 320px;
+    max-width: 85%;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-pane);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1.15rem;
+    gap: 1rem;
+    user-select: text;
+  }
+
+  /* RESIZE SPLITTER / DIVIDER BAR */
+  .splitter {
+    width: 8px;
+    background: #141f38;
+    cursor: col-resize;
+    position: relative;
+    transition: background 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .splitter:hover, .splitter.dragging {
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+  .splitter-handle {
+    width: 2px;
+    height: 28px;
+    background: #475569;
+    border-radius: 2px;
+  }
+
+  /* RIGHT: INTERACTIVE CHAT PANE (SCROLLABLE & RESIZABLE) */
+  .chat-pane {
+    flex: 1;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    background: #090e1a;
+    overflow: hidden;
+    user-select: text;
+  }
+
+  /* KPI METRICS */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem 0.95rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: #3b82f6;
+  }
+  .kpi-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+  .kpi-value {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+  .kpi-card.hazard .kpi-value { color: var(--hazard-red); text-shadow: 0 0 12px var(--hazard-glow); }
+  .kpi-card.nominal .kpi-value { color: var(--safe-green); }
+  .kpi-sub { font-size: 0.7rem; color: var(--text-secondary); }
+
+  /* POWER BI FILTERS / SLICERS */
+  .filter-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    flex-shrink: 0;
+  }
+  .filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .filter-header span {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #93c5fd;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-reset {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+  .filter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    align-items: center;
+  }
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+    min-width: 125px;
+  }
+  .filter-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .filter-select, .filter-input {
+    background: #090e1a;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.42rem 0.6rem;
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .filter-select:focus, .filter-input:focus { border-color: var(--accent); }
+
+  /* DATA GRID SECTION (SCROLLABLE & INTERACTIVE) */
+  .grid-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex: 1;
+    min-height: 280px;
+  }
+  .grid-toolbar {
+    padding: 0.7rem 0.95rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #101a30;
+    flex-shrink: 0;
+  }
+  .grid-toolbar-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .table-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    flex: 1;
+    max-height: 100%;
+  }
+  /* Custom scrollbar for sleek UI */
+  .analytics-pane::-webkit-scrollbar,
+  .table-scroll::-webkit-scrollbar,
+  #log::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+  .analytics-pane::-webkit-scrollbar-thumb,
+  .table-scroll::-webkit-scrollbar-thumb,
+  #log::-webkit-scrollbar-thumb {
+    background: #253966;
+    border-radius: 4px;
+  }
+  .analytics-pane::-webkit-scrollbar-thumb:hover,
+  .table-scroll::-webkit-scrollbar-thumb:hover,
+  #log::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+  }
+
+  table.data-grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    text-align: left;
+    white-space: nowrap;
+  }
+  table.data-grid th {
+    background: #0a1120;
+    padding: 0.65rem 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    cursor: pointer;
+    user-select: none;
+    z-index: 5;
+  }
+  table.data-grid th:hover { color: #60a5fa; background: #0f1930; }
+  table.data-grid td {
+    padding: 0.65rem 0.8rem;
+    border-bottom: 1px solid rgba(32, 47, 80, 0.6);
+    color: #e2e8f0;
+  }
+  table.data-grid tr:hover {
+    background: var(--bg-card-hover);
+  }
+  .badge-hazard {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--hazard-red);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.7rem;
+    display: inline-block;
+  }
+  .badge-safe {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--safe-green);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.7rem;
+    display: inline-block;
+  }
+
+  /* CHAT SECTION (SCROLLABLE & EXPANDABLE) */
+  .chat-header {
+    padding: 0.75rem 1.15rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #93c5fd;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0d1629;
+    flex-shrink: 0;
+  }
+  .quick-prompts {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.55rem 0.85rem;
+    background: #0a1122;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+  .quick-chip {
+    background: #15223e;
+    border: 1px solid var(--border);
+    color: #93c5fd;
+    font-size: 0.72rem;
+    padding: 0.28rem 0.6rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+  .quick-chip:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  #log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .msg {
+    display: flex;
+    flex-direction: column;
+  }
+  .msg.user { align-items: flex-end; }
+  .msg.agent { align-items: flex-start; }
+  .bubble {
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    font-size: 0.86rem;
+    line-height: 1.5;
+    max-width: 92%;
+    white-space: pre-wrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    user-select: text;
+  }
+  .msg.user .bubble {
+    background: var(--accent);
+    color: #ffffff;
+    border-bottom-right-radius: 3px;
+  }
+  .msg.agent .bubble {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: #f1f5f9;
+    border-bottom-left-radius: 3px;
+  }
+  .chat-input-form {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #0d1629;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .chat-input {
+    flex: 1;
+    background: #070c17;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.65rem 0.9rem;
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    outline: none;
+  }
+  .chat-input:focus { border-color: var(--accent); }
+  .btn-send {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.65rem 1.15rem;
+    font-weight: 600;
+    font-size: 0.86rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .btn-send:hover { background: #1d4ed8; }
+
+  .grid-empty {
+    padding: 2.5rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <span class="material-symbols-outlined" style="color:#60a5fa; font-size:1.6rem;">radar</span>
+    <h1>Aegis-NEO · Planetary Defense Command Dashboard</h1>
+    <span class="badge-live">Telemetry Live</span>
+  </div>
+  <div style="font-size:0.78rem; color:#94a3b8;">
+    Splitter: <strong style="color:#60a5fa;">Drag divider to resize</strong> | Epoch: <span id="currentEpoch">2026-10-13</span>
+  </div>
+</header>
+
+<div class="dashboard-wrapper" id="dashboardWrapper">
+
+  <!-- LEFT: ANALYTICS & POWER BI GRID (SCROLLABLE & RESIZABLE) -->
+  <section class="analytics-pane" id="analyticsPane">
+    
+    <!-- KPI SUMMARY CARDS -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <span class="kpi-title">Tracked Asteroids</span>
+        <span class="kpi-value" id="kpiTotal">0</span>
+        <span class="kpi-sub">Total in detection window</span>
+      </div>
+      <div class="kpi-card hazard">
+        <span class="kpi-title">Hazardous (PHA)</span>
+        <span class="kpi-value" id="kpiHazard">0</span>
+        <span class="kpi-sub">High priority tracking</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-title">Max Velocity</span>
+        <span class="kpi-value" id="kpiMaxVel">0 <span style="font-size:0.85rem;">km/s</span></span>
+        <span class="kpi-sub" id="kpiMaxVelName">-</span>
+      </div>
+      <div class="kpi-card nominal">
+        <span class="kpi-title">Closest Flyby</span>
+        <span class="kpi-value" id="kpiMinDist">0 <span style="font-size:0.85rem;">LD</span></span>
+        <span class="kpi-sub" id="kpiMinDistName">-</span>
+      </div>
+    </div>
+
+    <!-- POWER-BI STYLE SLICERS / FILTERS -->
+    <div class="filter-panel">
+      <div class="filter-header">
+        <span><span class="material-symbols-outlined" style="font-size:1rem;">filter_alt</span> Dashboard Slicers & Filters</span>
+        <button class="btn-reset" onclick="resetFilters()">Reset All Filters</button>
+      </div>
+      <div class="filter-controls">
+        <div class="filter-group">
+          <label class="filter-label">Hazard Status Slicer</label>
+          <select id="filterHazard" class="filter-select" onchange="applyFilters()">
+            <option value="ALL">All Asteroids (Total Grid)</option>
+            <option value="HAZARD_ONLY">⚠️ Potentially Hazardous Only</option>
+            <option value="NOMINAL_ONLY">✅ Nominal / Safe Only</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Min Diameter (Meters)</label>
+          <select id="filterDiameter" class="filter-select" onchange="applyFilters()">
+            <option value="0">All Sizes (&gt; 0m)</option>
+            <option value="50">&gt; 50 meters</option>
+            <option value="100">&gt; 100 meters (City Buster)</option>
+            <option value="200">&gt; 200 meters (Regional Threat)</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Max Proximity (Lunar Dist.)</label>
+          <select id="filterDistance" class="filter-select" onchange="applyFilters()">
+            <option value="999">All Distances</option>
+            <option value="50">&lt; 50 LD</option>
+            <option value="75">&lt; 75 LD</option>
+            <option value="100">&lt; 100 LD</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Search Asteroid Name</label>
+          <input type="text" id="filterSearch" class="filter-input" placeholder="e.g. 2010 DO..." oninput="applyFilters()">
+        </div>
+      </div>
+    </div>
+
+    <!-- INTERACTIVE POWER-BI DATA GRID -->
+    <div class="grid-section">
+      <div class="grid-toolbar">
+        <div class="grid-toolbar-title">
+          <span class="material-symbols-outlined" style="font-size:1.1rem; color:#60a5fa;">table_chart</span>
+          <span>Tactical Asteroid Grid</span>
+          <span id="filteredCountBadge" style="font-size:0.75rem; color:#94a3b8; font-weight:normal; margin-left:6px;">(Showing 0 of 0)</span>
+        </div>
+        <div style="font-size:0.72rem; color:#64748b;">
+          Click column headers to sort
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="data-grid" id="asteroidTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable('name')">Name ⬍</th>
+              <th onclick="sortTable('is_potentially_hazardous')">Hazard Status ⬍</th>
+              <th onclick="sortTable('estimated_diameter_meters')">Est. Diameter ⬍</th>
+              <th onclick="sortTable('velocity_km_s')">Velocity (km/s) ⬍</th>
+              <th onclick="sortTable('miss_distance_lunar')">Miss Distance (LD) ⬍</th>
+              <th onclick="sortTable('close_approach_date')">Approach Date ⬍</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="asteroidTableBody">
+            <tr>
+              <td colspan="7" class="grid-empty">
+                Ask Aegis-NEO to scan telemetry or click quick prompts to populate the live dashboard grid.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- DRAGGABLE SPLITTER FOR RESIZING PULL -->
+  <div class="splitter" id="splitter">
+    <div class="splitter-handle"></div>
+  </div>
+
+  <!-- RIGHT: CHAT / OFFICER CONSOLE (SCROLLABLE & EXPANDABLE) -->
+  <section class="chat-pane" id="chatPane">
+    <div class="chat-header">
+      <span style="display:flex; align-items:center; gap:6px;">
+        <span class="material-symbols-outlined" style="font-size:1.1rem; color:#60a5fa;">terminal</span>
+        Planetary Defense Officer Console
+      </span>
+      <span style="font-size:0.72rem; color:#64748b;">A2A Protocol · Session Active</span>
+    </div>
+
+    <!-- QUICK ACTION PROMPTS -->
+    <div class="quick-prompts">
+      <button class="quick-chip" onclick="quickPrompt('Fetch today\'s live near-Earth asteroid telemetry from NASA')">📡 Fetch Today's Asteroids</button>
+      <button class="quick-chip" onclick="quickPrompt('Which asteroids this week are potentially hazardous? Give me their diameters and velocities.')">⚠️ Scan Hazardous NEOs</button>
+      <button class="quick-chip" onclick="quickPrompt('Calculate impact physics and crater yield for a 200m asteroid at 25 km/s hitting rock')">💥 Simulate Impact Physics</button>
+      <button class="quick-chip" onclick="quickPrompt('Simulate kinetic impactor deflection for asteroid (2010 DO) with 5 years warning time')">🛡️ Kinetic Impactor Deflection</button>
+    </div>
+
+    <!-- SCROLLABLE CHAT LOG -->
+    <div id="log"></div>
+
+    <form id="form" class="chat-input-form">
+      <input id="input" class="chat-input" placeholder="Type mission orders, queries, or analysis requests..." autocomplete="off" autofocus>
+      <button class="btn-send">Send</button>
+    </form>
+  </section>
+
+</div>
+
+<script>
+// State Store for Live Dashboard
+let rawAsteroids = [];
+let filteredAsteroids = [];
+let sortCol = "miss_distance_lunar";
+let sortAsc = true;
+
+const log = document.getElementById("log");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+
+/* RESIZABLE SPLITTER LOGIC */
+const splitter = document.getElementById("splitter");
+const analyticsPane = document.getElementById("analyticsPane");
+const dashboardWrapper = document.getElementById("dashboardWrapper");
+
+let isDragging = false;
+
+splitter.addEventListener("mousedown", (e) => {
+  isDragging = true;
+  splitter.classList.add("dragging");
+  document.body.style.cursor = "col-resize";
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (!isDragging) return;
+  const containerRect = dashboardWrapper.getBoundingClientRect();
+  const newWidth = e.clientX - containerRect.left;
+  const containerWidth = containerRect.width;
+  const minWidth = 320;
+  const maxWidth = containerWidth - 300;
+
+  if (newWidth >= minWidth && newWidth <= maxWidth) {
+    const percentage = (newWidth / containerWidth) * 100;
+    analyticsPane.style.width = percentage + "%";
+  }
+});
+
+window.addEventListener("mouseup", () => {
+  if (isDragging) {
+    isDragging = false;
+    splitter.classList.remove("dragging");
+    document.body.style.cursor = "default";
+  }
+});
+
+function quickPrompt(text) {
+  input.value = text;
+  form.dispatchEvent(new Event("submit"));
+}
+
+function bubble(who) {
+  const m = document.createElement("div");
+  m.className = "msg " + who;
+  const b = document.createElement("div");
+  b.className = "bubble";
+  m.appendChild(b);
+  log.appendChild(m);
+  log.scrollTop = log.scrollHeight;
+  return b;
+}
+
+// Extract JSON or tabular NEO data from agent response to populate dashboard
+function harvestDataFromReply(parts) {
+  for (const p of parts) {
+    if (p.data) {
+      const resp = p.data.response || p.data;
+      if (resp && resp.result) {
+        try {
+          const parsed = typeof resp.result === "string" ? JSON.parse(resp.result) : resp.result;
+          if (parsed && Array.isArray(parsed.neo_threat_list)) {
+            loadAsteroids(parsed.neo_threat_list);
+            return;
+          }
+        } catch(e) {}
+      }
+    }
+    if (p.text && p.text.includes("|") && p.text.includes("---")) {
+      const parsedTable = parseMarkdownTable(p.text);
+      if (parsedTable.length > 0) {
+        loadAsteroids(parsedTable);
+        return;
+      }
+    }
+  }
+}
+
+function parseMarkdownTable(md) {
+  const lines = md.split("\n");
+  const tableRows = [];
+  let inTable = false;
+  let headers = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      const cols = trimmed.split("|").slice(1, -1).map(c => c.trim().replace(/\*\*/g, ''));
+      if (!inTable) {
+        headers = cols.map(h => h.toLowerCase());
+        inTable = true;
+      } else if (cols[0].includes("---")) {
+        continue;
+      } else {
+        if (cols.length >= 4) {
+          const name = cols[0];
+          const diam = parseFloat(cols[1].replace(/[^0-9.]/g, '')) || 50;
+          const vel = parseFloat(cols[2].replace(/[^0-9.]/g, '')) || 20;
+          const dist = parseFloat(cols[3].replace(/[^0-9.]/g, '')) || 50;
+          const isHaz = cols[4] ? cols[4].toLowerCase().includes("hazard") : false;
+          tableRows.push({
+            name: name,
+            estimated_diameter_meters: diam,
+            velocity_km_s: vel,
+            miss_distance_lunar: dist,
+            is_potentially_hazardous: isHaz,
+            close_approach_date: "2026-Oct-13"
+          });
+        }
+      }
+    } else {
+      if (inTable && tableRows.length > 0) break;
+    }
+  }
+  return tableRows;
+}
+
+function loadAsteroids(list) {
+  rawAsteroids = list.map(item => {
+    const app = item.approach || {};
+    return {
+      name: item.name || "Unknown",
+      is_potentially_hazardous: item.is_potentially_hazardous || false,
+      estimated_diameter_meters: Math.round(item.estimated_diameter_meters || item.estimated_diameter_min || 0),
+      velocity_km_s: app.velocity_km_s || item.velocity_km_s || 0,
+      miss_distance_lunar: app.miss_distance_lunar || item.miss_distance_lunar || 0,
+      close_approach_date: app.close_approach_date || item.close_approach_date || "2026-10-13",
+      nasa_jpl_url: item.nasa_jpl_url || ""
+    };
+  });
+  applyFilters();
+}
+
+function applyFilters() {
+  const hazFilter = document.getElementById("filterHazard").value;
+  const diamFilter = parseFloat(document.getElementById("filterDiameter").value) || 0;
+  const distFilter = parseFloat(document.getElementById("filterDistance").value) || 999;
+  const searchFilter = document.getElementById("filterSearch").value.toLowerCase().trim();
+
+  filteredAsteroids = rawAsteroids.filter(a => {
+    if (hazFilter === "HAZARD_ONLY" && !a.is_potentially_hazardous) return false;
+    if (hazFilter === "NOMINAL_ONLY" && a.is_potentially_hazardous) return false;
+    if (a.estimated_diameter_meters < diamFilter) return false;
+    if (a.miss_distance_lunar > distFilter) return false;
+    if (searchFilter && !a.name.toLowerCase().includes(searchFilter)) return false;
+    return true;
+  });
+
+  // Sort
+  filteredAsteroids.sort((a, b) => {
+    let va = a[sortCol];
+    let vb = b[sortCol];
+    if (typeof va === "string") return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return sortAsc ? (va - vb) : (vb - va);
+  });
+
+  updateKPICards();
+  renderGrid();
+}
+
+function sortTable(col) {
+  if (sortCol === col) {
+    sortAsc = !sortAsc;
+  } else {
+    sortCol = col;
+    sortAsc = true;
+  }
+  applyFilters();
+}
+
+function resetFilters() {
+  document.getElementById("filterHazard").value = "ALL";
+  document.getElementById("filterDiameter").value = "0";
+  document.getElementById("filterDistance").value = "999";
+  document.getElementById("filterSearch").value = "";
+  applyFilters();
+}
+
+function updateKPICards() {
+  const total = rawAsteroids.length;
+  const hazards = rawAsteroids.filter(a => a.is_potentially_hazardous).length;
+  document.getElementById("kpiTotal").textContent = total;
+  document.getElementById("kpiHazard").textContent = hazards;
+
+  if (rawAsteroids.length > 0) {
+    let maxVelObj = rawAsteroids.reduce((prev, curr) => (curr.velocity_km_s > prev.velocity_km_s) ? curr : prev, rawAsteroids[0]);
+    let minDistObj = rawAsteroids.reduce((prev, curr) => (curr.miss_distance_lunar < prev.miss_distance_lunar) ? curr : prev, rawAsteroids[0]);
+    
+    document.getElementById("kpiMaxVel").innerHTML = `${maxVelObj.velocity_km_s.toFixed(1)} <span style="font-size:0.85rem;">km/s</span>`;
+    document.getElementById("kpiMaxVelName").textContent = maxVelObj.name;
+
+    document.getElementById("kpiMinDist").innerHTML = `${minDistObj.miss_distance_lunar.toFixed(1)} <span style="font-size:0.85rem;">LD</span>`;
+    document.getElementById("kpiMinDistName").textContent = minDistObj.name;
+  }
+  document.getElementById("filteredCountBadge").textContent = `(Showing ${filteredAsteroids.length} of ${total})`;
+}
+
+function renderGrid() {
+  const tbody = document.getElementById("asteroidTableBody");
+  tbody.innerHTML = "";
+
+  if (filteredAsteroids.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="grid-empty">No asteroids match active slicers. Try adjusting filters above.</td></tr>`;
+    return;
+  }
+
+  for (const a of filteredAsteroids) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="font-weight:600; color:#93c5fd;">${a.name}</td>
+      <td>${a.is_potentially_hazardous ? '<span class="badge-hazard">⚠️ HAZARDOUS</span>' : '<span class="badge-safe">NOMINAL</span>'}</td>
+      <td><strong>${a.estimated_diameter_meters}</strong> m</td>
+      <td>${a.velocity_km_s.toFixed(2)} km/s</td>
+      <td>${a.miss_distance_lunar.toFixed(2)} LD</td>
+      <td>${a.close_approach_date}</td>
+      <td>
+        <button onclick="simulateTarget('${a.name}', ${a.estimated_diameter_meters}, ${a.velocity_km_s})" style="background:#1e3a8a; border:1px solid #3b82f6; color:#fff; border-radius:4px; padding:3px 8px; font-size:0.75rem; cursor:pointer;">Defend</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function simulateTarget(name, diam, vel) {
+  quickPrompt(`Calculate impact physics and simulate kinetic deflection for asteroid ${name} (diameter: ${diam}m, velocity: ${vel} km/s)`);
+}
+
+// Chat submission
+form.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  bubble("user").textContent = text;
+  input.value = "";
+  const b = bubble("agent");
+  b.textContent = "Analyzing telemetry & running simulations…";
+
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, user_id: "commander-lead" })
+    });
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); }
+    catch { throw new Error(`Server returned non-JSON. ${raw.slice(0, 300)}`); }
+    
+    b.textContent = "";
+    const parts = data.parts || [];
+    const texts = parts.filter(p => p && p.kind === "text").map(p => p.text);
+    if (texts.length) {
+      b.textContent = texts.join("\n\n");
+    } else {
+      b.textContent = "(Analysis complete)";
+    }
+    
+    harvestDataFromReply(parts);
+
+  } catch(e) {
+    b.textContent = "Telemetry Error: " + e.message;
+  }
+});
+
+// Auto-fetch initial telemetry on load
+window.addEventListener("DOMContentLoaded", () => {
+  quickPrompt("Hello Aegis-NEO, fetch today's live asteroid telemetry and present tactical briefing.");
+});
+</script>
+</body>
+</html>
